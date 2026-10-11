@@ -1,0 +1,8 @@
+services:
+  minidb:
+    build: .
+    volumes:
+      - minidb-data:/app/data   # data survives container restarts
+
+volumes:
+  minidb-data:
