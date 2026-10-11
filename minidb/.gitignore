@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Database files and logs: generated, never committed
+data/
+*.db
+*.log
+
+# Editors
+.vscode/
+.idea/
