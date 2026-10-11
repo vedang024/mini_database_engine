@@ -1,0 +1,6 @@
+[database]
+data_dir = "data"
+page_size = 4096    # fixed at database creation; changing it later breaks existing files
+
+[logging]
+level = "INFO"
