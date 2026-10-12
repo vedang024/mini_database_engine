@@ -1,12 +1,11 @@
 from __future__ import annotations
-
 import logging
 import os
 import struct
 from pathlib import Path
 from types import TracebackType
-
 from minidb.storage.errors import DiskManagerError, InvalidPageError
+from minidb.storage.page import Page
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +16,11 @@ HEADER = struct.Struct("<8sI")  # magic (8 bytes), page_size (uint32)
 HEADER_PAGE_ID: PageId = 0
 FIRST_DATA_PAGE_ID: PageId = 1
 
+def page_offset(page_id: PageId, page_size: int) -> int:
+    """Byte position of a page in the file: the heart of page addressing."""
+    if page_id < 0:
+        raise InvalidPageError(f"page id must be >= 0, got {page_id}")
+    return page_id * page_size
 
 class DiskManager:
     def __init__(self, path: str | Path, page_size: int = 4096) -> None:
@@ -50,14 +54,14 @@ class DiskManager:
     def allocate_page(self) -> PageId:
         """Append a zero-filled page and return its id (always >= 1)."""
         page_id = self._num_pages
-        self._write_at(page_id * self._page_size, bytes(self._page_size))
+        self._write_at(self.offset_of(page_id), bytes(self._page_size))
         self._num_pages += 1
         logger.debug("Allocated page %d", page_id)
         return page_id
 
     def read_page(self, page_id: PageId) -> bytes:
         self._check_page_id(page_id)
-        data = self._read_at(page_id * self._page_size, self._page_size)
+        data = self._read_at(self.offset_of(page_id), self._page_size)
         if len(data) != self._page_size:
             raise DiskManagerError(f"Short read on page {page_id}: got {len(data)} bytes")
         return data
@@ -68,7 +72,19 @@ class DiskManager:
             raise InvalidPageError(
                 f"Page data must be exactly {self._page_size} bytes, got {len(data)}"
             )
-        self._write_at(page_id * self._page_size, data)
+        self._write_at(self.offset_of(page_id), data)
+
+    def offset_of(self, page_id: PageId) -> int:
+        return page_offset(page_id, self._page_size)
+
+    def fetch_page(self, page_id: PageId) -> Page:
+        """Read a page into a mutable in-memory Page (a copy, not a view)."""
+        return Page(page_id, bytearray(self.read_page(page_id)))
+
+    def flush_page(self, page: Page) -> None:
+        """Write a Page back to its place in the file and mark it clean."""
+        self.write_page(page.page_id, bytes(page.data))
+        page.dirty = False
 
     def sync(self) -> None:
         """Force OS-cached writes onto the physical device (durability)."""

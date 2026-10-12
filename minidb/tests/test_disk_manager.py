@@ -2,6 +2,7 @@ import pytest
 
 from minidb.storage.disk_manager import DiskManager
 from minidb.storage.errors import DiskManagerError, InvalidPageError
+from minidb.storage.disk_manager import page_offset
 
 PAGE = 4096
 
@@ -104,3 +105,42 @@ def test_file_size_matches_page_count(db_path):
         for _ in range(3):
             dm.allocate_page()
     assert db_path.stat().st_size == 4 * PAGE
+
+@pytest.mark.parametrize("pid,expected", [(0, 0), (1, 4096), (3, 12288)])
+def test_page_offset_formula(pid, expected):
+    assert page_offset(pid, 4096) == expected
+
+
+def test_negative_page_offset_rejected():
+    with pytest.raises(InvalidPageError):
+        page_offset(-1, 4096)
+
+
+def test_offset_of_matches_physical_location(db_path):
+    with DiskManager(db_path, PAGE) as dm:
+        pid = dm.allocate_page()
+        dm.write_page(pid, b"Z" * PAGE)
+        dm.sync()
+        with open(db_path, "rb") as f:
+            f.seek(dm.offset_of(pid))
+            assert f.read(PAGE) == b"Z" * PAGE
+
+
+def test_fetch_modify_flush_persists(db_path):
+    with DiskManager(db_path, PAGE) as dm:
+        pid = dm.allocate_page()
+        page = dm.fetch_page(pid)
+        page.write(0, b"abc")
+        assert page.dirty
+        dm.flush_page(page)
+        assert not page.dirty
+    with DiskManager(db_path, PAGE) as dm:
+        assert dm.fetch_page(pid).read(0, 3) == b"abc"
+
+
+def test_fetch_page_is_a_copy_until_flushed(db_path):
+    with DiskManager(db_path, PAGE) as dm:
+        pid = dm.allocate_page()
+        page = dm.fetch_page(pid)
+        page.write(0, b"xyz")  # modified in memory only
+        assert dm.fetch_page(pid).read(0, 3) == b"\x00\x00\x00"
