@@ -10,7 +10,7 @@ from typing import Any, TypeVar
 MIN_PAGE_SIZE = 512
 MAX_PAGE_SIZE = 65536
 VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-
+DB_FILE_NAME = "minidb.db"
 
 class ConfigError(Exception):
     """Raised when the configuration is invalid."""
@@ -33,6 +33,9 @@ class DatabaseConfig:
                 f"page_size must be a power of two between "
                 f"{MIN_PAGE_SIZE} and {MAX_PAGE_SIZE}, got {size!r}"
             )
+    @property
+    def db_path(self) -> Path:
+        return self.data_dir / DB_FILE_NAME
 
 
 @dataclass(frozen=True)
