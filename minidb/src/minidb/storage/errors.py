@@ -23,3 +23,10 @@ class RecordTooLargeError(StorageError):
 
 class CorruptPageError(StorageError):
     """A page's internal structure is inconsistent."""
+
+class InvalidSlotError(StorageError):
+    """Slot number out of range, or the slot refers to a deleted record."""
+
+
+class PageFullError(StorageError):
+    """The page does not have enough free space for this record."""
