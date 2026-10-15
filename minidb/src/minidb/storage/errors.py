@@ -30,3 +30,10 @@ class InvalidSlotError(StorageError):
 
 class PageFullError(StorageError):
     """The page does not have enough free space for this record."""
+
+class BufferPoolError(StorageError):
+    """Misuse of the buffer pool (for example, unpinning a page that is not pinned)."""
+
+
+class BufferPoolFullError(BufferPoolError):
+    """Every frame is pinned, so no page can be evicted to make room."""
