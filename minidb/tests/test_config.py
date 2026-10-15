@@ -58,3 +58,15 @@ def test_missing_file_raises(tmp_path):
 def test_shipped_config_is_valid():
     cfg = load_config(REPO_ROOT / "config" / "minidb.toml")
     assert cfg.database.page_size == 4096
+
+def test_buffer_pool_pages_default_and_override(tmp_path):
+    assert load_config(None).database.buffer_pool_pages == 64
+    p = write(tmp_path / "c.toml", "[database]\nbuffer_pool_pages = 8\n")
+    assert load_config(p).database.buffer_pool_pages == 8
+
+
+@pytest.mark.parametrize("bad", [0, -5])
+def test_invalid_buffer_pool_pages_rejected(tmp_path, bad):
+    p = write(tmp_path / "c.toml", f"[database]\nbuffer_pool_pages = {bad}\n")
+    with pytest.raises(ConfigError):
+        load_config(p)

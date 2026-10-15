@@ -20,6 +20,7 @@ class ConfigError(Exception):
 class DatabaseConfig:
     data_dir: Path = Path("data")
     page_size: int = 4096
+    buffer_pool_pages: int = 64
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "data_dir", Path(self.data_dir))
@@ -32,6 +33,10 @@ class DatabaseConfig:
             raise ConfigError(
                 f"page_size must be a power of two between "
                 f"{MIN_PAGE_SIZE} and {MAX_PAGE_SIZE}, got {size!r}"
+            )
+        if not isinstance(self.buffer_pool_pages, int) or self.buffer_pool_pages < 1:
+            raise ConfigError(
+                f"buffer_pool_pages must be a positive integer, got {self.buffer_pool_pages!r}"
             )
     @property
     def db_path(self) -> Path:

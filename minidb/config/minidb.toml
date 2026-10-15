@@ -1,6 +1,7 @@
 [database]
 data_dir = "data"
 page_size = 4096    # fixed at database creation; changing it later breaks existing files
+buffer_pool_pages = 64   # in-memory page frames: 64 x 4 KB = 256 KB of cache
 
 [logging]
 level = "INFO"
