@@ -25,6 +25,8 @@ def validate_identifier(name: str) -> str:
         )
     return lowered
 
+_ALIASES = {"INTEGER": "INT", "BOOLEAN": "BOOL", "STRING": "TEXT", "VARCHAR": "TEXT"}
+MAX_TEXT_CHARS = 0xFFFF
 
 class ColumnType(Enum):
     INT = "INT"
@@ -36,8 +38,9 @@ class ColumnType(Enum):
     def parse(cls, value: "ColumnType | str") -> "ColumnType":
         if isinstance(value, cls):
             return value
+        text = str(value).upper()
         try:
-            return cls(str(value).upper())
+            return cls(_ALIASES.get(text, text))
         except ValueError:
             raise SchemaError(
                 f"unknown column type {value!r}; choose from {[t.value for t in cls]}"
@@ -47,15 +50,27 @@ class ColumnType(Enum):
 @dataclass(frozen=True)
 class Column:
     name: str
-    type: ColumnType  # a type name such as "int" is accepted and converted
+    type: ColumnType  # a name such as "int" or "string" is accepted and converted
     nullable: bool = True
+    max_length: int | None = None  # TEXT only: maximum length in CHARACTERS
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "name", validate_identifier(self.name))
         object.__setattr__(self, "type", ColumnType.parse(self.type))
         if not isinstance(self.nullable, bool):
             raise SchemaError(f"column {self.name!r}: nullable must be True or False")
-
+        if self.max_length is not None:
+            if self.type is not ColumnType.TEXT:
+                raise SchemaError(f"column {self.name!r}: max_length applies only to TEXT")
+            if (
+                isinstance(self.max_length, bool)
+                or not isinstance(self.max_length, int)
+                or not (1 <= self.max_length <= MAX_TEXT_CHARS)
+            ):
+                raise SchemaError(
+                    f"column {self.name!r}: max_length must be an integer "
+                    f"between 1 and {MAX_TEXT_CHARS}, got {self.max_length!r}"
+                )
 
 @dataclass(frozen=True)
 class Schema:
@@ -85,15 +100,18 @@ class Schema:
         raise SchemaError(f"no such column: {name!r}")
 
     def to_json(self) -> str:
-        return json.dumps(
-            [{"name": c.name, "type": c.type.value, "nullable": c.nullable} for c in self.columns],
-            separators=(",", ":"),
-        )
+        def column_dict(c: Column) -> dict:
+            d = {"name": c.name, "type": c.type.value, "nullable": c.nullable}
+            if c.max_length is not None:
+                d["max_length"] = c.max_length
+            return d
+
+        return json.dumps([column_dict(c) for c in self.columns], separators=(",", ":"))
 
     @classmethod
     def from_json(cls, text: str) -> "Schema":
         try:
             raw = json.loads(text)
-            return cls(tuple(Column(i["name"], i["type"], i["nullable"]) for i in raw))
+            return cls(tuple(Column(i["name"], i["type"], i["nullable"], i.get("max_length")) for i in raw))
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise SchemaError(f"invalid schema JSON: {exc}") from exc

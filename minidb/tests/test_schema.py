@@ -78,3 +78,45 @@ def test_json_roundtrip():
 def test_bad_schema_json_rejected(bad):
     with pytest.raises(SchemaError):
         Schema.from_json(bad)
+@pytest.mark.parametrize(
+    "alias,expected",
+    [
+        ("integer", ColumnType.INT),
+        ("BOOLEAN", ColumnType.BOOL),
+        ("string", ColumnType.TEXT),
+        ("VarChar", ColumnType.TEXT),
+    ],
+)
+def test_type_aliases(alias, expected):
+    assert ColumnType.parse(alias) is expected
+
+
+def test_max_length_on_text_is_accepted():
+    assert Column("n", "STRING", max_length=5).max_length == 5
+
+
+def test_max_length_only_allowed_on_text():
+    with pytest.raises(SchemaError, match="TEXT"):
+        Column("n", "INT", max_length=5)
+
+
+@pytest.mark.parametrize("bad", [0, -1, 65536, True, "5"])
+def test_invalid_max_length_rejected(bad):
+    with pytest.raises(SchemaError):
+        Column("n", "TEXT", max_length=bad)
+
+
+def test_max_length_survives_json_roundtrip():
+    schema = Schema([Column("n", "TEXT", max_length=20), Column("m", "TEXT")])
+    restored = Schema.from_json(schema.to_json())
+    assert restored == schema
+    assert restored.columns[0].max_length == 20
+
+
+def test_json_without_max_length_still_loads():
+    old = '[{"name":"a","type":"INT","nullable":true}]'  # the Phase 7 catalog format
+    assert Schema.from_json(old).columns[0].max_length is None
+
+
+def test_max_length_is_omitted_from_json_when_unset():
+    assert "max_length" not in Schema([Column("a", "INT")]).to_json()

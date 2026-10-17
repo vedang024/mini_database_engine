@@ -27,3 +27,10 @@ class TableNotFoundError(TableError):
 
 class CatalogError(TableError):
     """The catalog and the files on disk disagree."""
+
+class RowValidationError(RowError):
+    """A row broke one or more schema rules. `problems` lists every violation."""
+
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__("; ".join(problems))
+        self.problems = problems
