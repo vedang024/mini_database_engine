@@ -34,3 +34,18 @@ class RowValidationError(RowError):
     def __init__(self, problems: list[str]) -> None:
         super().__init__("; ".join(problems))
         self.problems = problems
+
+class UniqueViolationError(TableError):
+    """A key would appear twice in a unique index."""
+
+
+class IndexExistsError(TableError):
+    """CREATE INDEX for a column that already has one."""
+
+
+class IndexNotFoundError(TableError):
+    """An index-only operation was requested on a column without an index."""
+
+
+class IndexInconsistentError(TableError):
+    """An index entry and the heap disagree (stale or corrupt index)."""
