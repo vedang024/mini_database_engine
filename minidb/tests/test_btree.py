@@ -328,3 +328,52 @@ def test_check_detects_a_broken_leaf_chain(make_tree):
     tree._write(node)
     with pytest.raises(CorruptIndexError, match="chain"):
         tree.check()
+def test_lazy_delete_removes_only_that_key(make_tree):
+    tree = make_tree(max_keys=3)
+    build(tree, range(20))
+    assert tree.delete(7) is True
+    assert tree.search(7) is None
+    assert tree.delete(7) is False            # already gone
+    assert tree.delete(1000) is False         # never existed
+    assert [k for k, _ in tree.range_scan()] == [k for k in range(20) if k != 7]
+    tree.check(strict_fill=False)
+
+
+def test_delete_everything_then_reuse_the_tree(make_tree):
+    tree = make_tree(max_keys=3)
+    build(tree, range(30))
+    for k in range(30):
+        assert tree.delete(k) is True
+    assert list(tree.range_scan()) == []      # the scan skips empty leaves
+    assert tree.search(5) is None
+    tree.check(strict_fill=False)
+    tree.insert(5, rid(5))
+    assert tree.search(5) == rid(5)
+
+
+def test_delete_persists_after_reopen(make_tree):
+    tree = make_tree(max_keys=4)
+    build(tree, range(40))
+    for k in range(0, 40, 2):
+        tree.delete(k)
+    tree.close()
+    again = make_tree()
+    assert [k for k, _ in again.range_scan()] == list(range(1, 40, 2))
+
+
+def test_random_insert_and_delete_match_a_dict_model(make_tree):
+    rng = random.Random(33)
+    tree = make_tree(max_keys=4, pool_pages=4)
+    model: dict[int, RecordId] = {}
+    for i in range(2000):
+        k = rng.randrange(300)
+        if k in model:
+            assert tree.delete(k) is True
+            del model[k]
+        else:
+            tree.insert(k, rid(k))
+            model[k] = rid(k)
+        if i % 100 == 0:
+            tree.check(strict_fill=False)
+    assert dict(tree.range_scan()) == model
+    assert tree.check(strict_fill=False).key_count == len(model)

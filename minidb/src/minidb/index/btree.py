@@ -426,3 +426,19 @@ class BPlusTree:
             or not (0 <= rid.slot <= MAX_SLOT)
         ):
             raise BTreeError(f"invalid record id: {rid!r}")
+
+    def delete(self, key: int) -> bool:
+        """Remove a key. Returns False if it was not present (nothing is written).
+
+        Lazy: leaves may become underfull or empty and are never merged. Searches
+        and scans stay correct; check() needs strict_fill=False afterwards.
+        """
+        key = self._check_key(key)
+        leaf = self._descend(key)
+        pos = bisect_left(leaf.keys, key)
+        if pos >= len(leaf.keys) or leaf.keys[pos] != key:
+            return False
+        del leaf.keys[pos]
+        del leaf.rids[pos]
+        self._write(leaf)
+        return True
