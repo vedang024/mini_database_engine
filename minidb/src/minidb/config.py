@@ -10,6 +10,7 @@ from typing import Any, TypeVar
 MIN_PAGE_SIZE = 512
 MAX_PAGE_SIZE = 65536
 VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+VALID_EVICTION_POLICIES = {"fifo", "lru", "clock"}
 DB_FILE_NAME = "minidb.db"
 
 class ConfigError(Exception):
@@ -21,6 +22,7 @@ class DatabaseConfig:
     data_dir: Path = Path("data")
     page_size: int = 4096
     buffer_pool_pages: int = 64
+    eviction_policy: str = "lru"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "data_dir", Path(self.data_dir))
@@ -38,6 +40,13 @@ class DatabaseConfig:
             raise ConfigError(
                 f"buffer_pool_pages must be a positive integer, got {self.buffer_pool_pages!r}"
             )
+        policy = str(self.eviction_policy).lower()
+        if policy not in VALID_EVICTION_POLICIES:
+            raise ConfigError(
+                f"eviction_policy must be one of {sorted(VALID_EVICTION_POLICIES)}, "
+                f"got {self.eviction_policy!r}"
+            )
+        object.__setattr__(self, "eviction_policy", policy)
     @property
     def db_path(self) -> Path:
         return self.data_dir / DB_FILE_NAME
